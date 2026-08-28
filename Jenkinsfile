@@ -8,7 +8,7 @@ pipeline {
 
     environment {
         DOCKER_HUB = credentials('docker_hub_credentials')
-        APP_IMAGE = "roka666/myapp"
+        APP_IMAGE = "rokaa666/myapp"
     }
 
     stages {
