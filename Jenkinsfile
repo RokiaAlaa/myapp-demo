@@ -7,7 +7,7 @@ pipeline {
     }
 
     environment {
-        DOCKER_HUB = credentials('docker_hub_credentials')
+        DOCKER_HUB = credentials('docker-hub-credentials')
         APP_IMAGE = "rokaa666/myapp"
     }
 
