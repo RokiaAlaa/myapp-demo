@@ -66,7 +66,7 @@ pipeline {
                     ],
                     vaultSecrets: [
                         [
-                            path: 'secret/myapp/docker',
+                            path: 'secret/data/myapp/docker',
                             secretValues: [
                                 [envVar: 'DOCKER_HUB_USR', vaultKey: 'username'],
                                 [envVar: 'DOCKER_HUB_PSW', vaultKey: 'password'],
@@ -129,7 +129,7 @@ pipeline {
                 ],
                 vaultSecrets: [
                     [
-                        path: 'secret/myapp/docker',
+                        path: 'secret/data/myapp/docker',
                         secretValues: [
                             [envVar: 'SLACK_WEBHOOK', vaultKey: 'webhook_url']
                         ]
@@ -154,7 +154,7 @@ pipeline {
                 ],
                 vaultSecrets: [
                     [
-                        path: 'secret/myapp/docker',
+                        path: 'secret/data/myapp/docker',
                         secretValues: [
                             [envVar: 'SLACK_WEBHOOK', vaultKey: 'webhook_url']
                         ]
