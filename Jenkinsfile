@@ -1,13 +1,12 @@
 pipeline {
     agent any
-    
+
     options {
         timeout(time: 30, unit: 'MINUTES')
         timestamps()
     }
 
     environment {
-        // DOCKER_HUB = credentials('docker-hub-credentials')
         APP_IMAGE = "rokaa666/myapp"
     }
 
@@ -43,12 +42,15 @@ pipeline {
                     }
                 }
                 stages {
-                    stage('Run Tests') {
+                    stage('Test') {
                         steps {
-                            sh '''
-                            docker run --rm -v jenkins_home:/var/jenkins_home -w \${WORKSPACE} python:\${PYTHON_VERSION} \
-                            sh -c "pip install -r requirements.txt && pytest -v"
-                            '''
+                            sh """
+                                docker run --rm \
+                                    -v jenkins_home:/var/jenkins_home \
+                                    -w \${WORKSPACE} \
+                                    python:\${PYTHON_VERSION} \
+                                    sh -c 'pip install -r requirements.txt --quiet && pytest -v'
+                            """
                         }
                     }
                 }
@@ -62,77 +64,131 @@ pipeline {
                         vaultUrl: 'http://host.docker.internal:8200',
                         vaultCredentialId: 'vault-approle-cred',
                         engineVersion: 2
-                        
                     ],
                     vaultSecrets: [
                         [
                             path: 'secret/myapp/docker',
                             secretValues: [
                                 [envVar: 'DOCKER_HUB_USR', vaultKey: 'username'],
-                                [envVar: 'DOCKER_HUB_PSW', vaultKey: 'password'],
+                                [envVar: 'DOCKER_HUB_PSW', vaultKey: 'password']
                             ]
                         ]
                     ]
-
-                ){
+                ) {
                     sh '''
-                    echo $DOCKER_HUB_PSW | docker login -u $DOCKER_HUB_USR --password-stdin
-                    docker push ${APP_IMAGE}:${BUILD_NUMBER}
-                    docker push ${APP_IMAGE}:latest
+                        echo $DOCKER_HUB_PSW | docker login -u $DOCKER_HUB_USR --password-stdin
+                        docker push ${APP_IMAGE}:${BUILD_NUMBER}
+                        docker push ${APP_IMAGE}:latest
                     '''
                 }
                 echo "Images pushed to Docker Hub"
             }
         }
 
-        stage('Blue-Green Deployment') {
+        stage('Canary Deployment') {
             steps {
                 script {
                     sh '''
-                    docker stop myapp-green || true
-                    docker rm myapp-green || true 
-                    docker run -d --name myapp-green --network myapp-network ${APP_IMAGE}:${BUILD_NUMBER}
+                        docker stop myapp-green || true
+                        docker rm myapp-green || true
+                        docker run -d --name myapp-green --network myapp-network ${APP_IMAGE}:${BUILD_NUMBER}
                     '''
 
-                    def isRunning = false
-                    for (int i = 0; i < 10; i++) {
-                        sleep 3
-                        def status = sh(
-                            script: 'docker inspect -f "{{.State.Running}}" myapp-green || echo false',
-                            returnStdout: true
-                        ).trim()
-                        if (status == 'true') {
-                            isRunning = true
-                            break
-                        }
-                    }
-                    if (!isRunning) {
-                        error("myapp-green container failed to start in time")
-                    }
+                    sleep 5
 
                     def healthCheck = sh(
                         script: 'docker exec myapp-nginx curl -s -o /dev/null -w "%{http_code}" http://myapp-green:8000/health',
                         returnStdout: true
                     ).trim()
 
-                    if (healthCheck == '200') {
+                    if (healthCheck != '200') {
                         sh '''
-                        sed -i "s/myapp-blue:8000/myapp-green:8000/" /nginx-config/nginx.conf
+                            docker stop myapp-green || true
+                            docker rm myapp-green || true
+                        '''
+                        error("Canary health check failed, deployment aborted")
+                    }
+
+                    writeFile file: '/nginx-config/nginx.conf', text: '''events {}
+http {
+    upstream myapp {
+        server myapp-blue:8000 weight=9;
+        server myapp-green:8000 weight=1;
+    }
+    server {
+        listen 80;
+        location / {
+            proxy_pass http://myapp;
+        }
+        location /health {
+            proxy_pass http://myapp/health;
+        }
+    }
+}
+'''
+                    sh '''
                         docker exec myapp-nginx nginx -s reload
-                        echo "Switched traffic to green"
+                        echo "Canary receiving 10% of traffic"
+                    '''
+
+                    sleep 10
+
+                    def canaryCheck = sh(
+                        script: 'docker exec myapp-nginx curl -s -o /dev/null -w "%{http_code}" http://myapp-green:8000/health',
+                        returnStdout: true
+                    ).trim()
+
+                    if (canaryCheck == '200') {
+                        writeFile file: '/nginx-config/nginx.conf', text: '''events {}
+http {
+    upstream myapp {
+        server myapp-green:8000;
+    }
+    server {
+        listen 80;
+        location / {
+            proxy_pass http://myapp;
+        }
+        location /health {
+            proxy_pass http://myapp/health;
+        }
+    }
+}
+'''
+                        sh '''
+                            docker exec myapp-nginx nginx -s reload
+                            echo "Canary promoted to 100% traffic"
                         '''
                     } else {
+                        writeFile file: '/nginx-config/nginx.conf', text: '''events {}
+http {
+    upstream myapp {
+        server myapp-blue:8000;
+    }
+    server {
+        listen 80;
+        location / {
+            proxy_pass http://myapp;
+        }
+        location /health {
+            proxy_pass http://myapp/health;
+        }
+    }
+}
+'''
                         sh '''
-                        docker stop myapp-green || true
-                        docker rm myapp-green || true
-                        echo Health check failed for green deployment. Rolling back to blue.
+                            docker exec myapp-nginx nginx -s reload
+                            docker stop myapp-green || true
+                            docker rm myapp-green || true
+                            echo "Canary rollback - reverted to stable"
                         '''
-                        error("Health check failed, deployment aborted")
+                        error("Canary monitoring failed, rolled back")
                     }
                 }
             }
         }
     }
+
     post {
         success {
             withVault(
@@ -140,7 +196,6 @@ pipeline {
                     vaultUrl: 'http://host.docker.internal:8200',
                     vaultCredentialId: 'vault-approle-cred',
                     engineVersion: 2
-
                 ],
                 vaultSecrets: [
                     [
@@ -150,13 +205,12 @@ pipeline {
                         ]
                     ]
                 ]
-
-            ){
-            sh '''
-            curl -X POST -H "Content-type: application/json" \
-            --data '{"text":"✅ Deployment successful!"}' \
-            ${SLACK_WEBHOOK}
-            '''
+            ) {
+                sh '''
+                    curl -X POST -H "Content-type: application/json" \
+                        --data '{"text":"✅ Deployment successful!"}' \
+                        ${SLACK_WEBHOOK}
+                '''
             }
         }
         failure {
@@ -165,7 +219,6 @@ pipeline {
                     vaultUrl: 'http://host.docker.internal:8200',
                     vaultCredentialId: 'vault-approle-cred',
                     engineVersion: 2
-
                 ],
                 vaultSecrets: [
                     [
@@ -175,13 +228,12 @@ pipeline {
                         ]
                     ]
                 ]
-
-            ){
-            sh '''
-            curl -X POST -H "Content-type: application/json" \
-            --data '{"text":"❌ Deployment failed!"}' \
-            ${SLACK_WEBHOOK}
-            '''
+            ) {
+                sh '''
+                    curl -X POST -H "Content-type: application/json" \
+                        --data '{"text":"❌ Deployment failed!"}' \
+                        ${SLACK_WEBHOOK}
+                '''
             }
         }
     }
