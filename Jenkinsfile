@@ -117,7 +117,7 @@ pipeline {
 
                     if (healthCheck == '200') {
                         sh '''
-                        docker exec myapp-nginx sed -i "s/myapp-blue:8000/myapp-green:8000/" /etc/nginx-config/nginx.conf"
+                        docker exec myapp-nginx sed -i "s/myapp-blue:8000/myapp-green:8000/" /etc/nginx/nginx.conf
                         docker exec myapp-nginx nginx -s reload
                         echo "Switched traffic to green"
                         '''
