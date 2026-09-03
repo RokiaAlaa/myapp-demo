@@ -46,7 +46,7 @@ pipeline {
                     stage('Run Tests') {
                         steps {
                             sh '''
-                            docker run --rm -v \${WORKSPACE}:/app -w /app python:\${PYTHON_VERSION} \
+                            docker run --rm -v jenkins_home:/var/jenkins_home -w \${WORKSPACE} python:\${PYTHON_VERSION} \
                             sh -c "pip install -r requirements.txt && pytest -v"
                             '''
                         }
