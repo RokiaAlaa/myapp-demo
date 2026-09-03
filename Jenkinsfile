@@ -127,6 +127,7 @@ http {
 }
 '''
                     sh '''
+                        docker cp /nginx-config/nginx.conf myapp-nginx:/etc/nginx/nginx.conf
                         docker exec myapp-nginx nginx -s reload
                         echo "Canary receiving 10% of traffic"
                     '''
@@ -156,6 +157,7 @@ http {
 }
 '''
                         sh '''
+                            docker cp /nginx-config/nginx.conf myapp-nginx:/etc/nginx/nginx.conf
                             docker exec myapp-nginx nginx -s reload
                             echo "Canary promoted to 100% traffic"
                         '''
@@ -177,6 +179,7 @@ http {
 }
 '''
                         sh '''
+                            docker cp /nginx-config/nginx.conf myapp-nginx:/etc/nginx/nginx.conf
                             docker exec myapp-nginx nginx -s reload
                             docker stop myapp-green || true
                             docker rm myapp-green || true
