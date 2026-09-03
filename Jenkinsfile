@@ -84,6 +84,7 @@ pipeline {
                 echo "Images pushed to Docker Hub"
             }
         }
+
         stage('Blue-Green Deployment') {
             steps {
                 script {
@@ -92,7 +93,22 @@ pipeline {
                     docker rm myapp-green || true 
                     docker run -d --name myapp-green --network myapp-network ${APP_IMAGE}:${BUILD_NUMBER}
                     '''
-                    sleep 10
+
+                    def isRunning = false
+                    for (int i = 0; i < 10; i++) {
+                        sleep 3
+                        def status = sh(
+                            script: 'docker inspect -f "{{.State.Running}}" myapp-green || echo false',
+                            returnStdout: true
+                        ).trim()
+                        if (status == 'true') {
+                            isRunning = true
+                            break
+                        }
+                    }
+                    if (!isRunning) {
+                        error("myapp-green container failed to start in time")
+                    }
 
                     def healthCheck = sh(
                         script: 'docker exec myapp-nginx curl -s -o /dev/null -w "%{http_code}" http://myapp-green:8000/health',
@@ -116,7 +132,6 @@ pipeline {
                 }
             }
         }
-
     }
     post {
         success {
