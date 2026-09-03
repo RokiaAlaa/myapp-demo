@@ -129,7 +129,7 @@ pipeline {
                 ],
                 vaultSecrets: [
                     [
-                        path: 'secret/myapp/docker',
+                        path: 'secret/myapp/slack',
                         secretValues: [
                             [envVar: 'SLACK_WEBHOOK', vaultKey: 'webhook_url']
                         ]
@@ -154,7 +154,7 @@ pipeline {
                 ],
                 vaultSecrets: [
                     [
-                        path: 'secret/myapp/docker',
+                        path: 'secret/myapp/slack',
                         secretValues: [
                             [envVar: 'SLACK_WEBHOOK', vaultKey: 'webhook_url']
                         ]
