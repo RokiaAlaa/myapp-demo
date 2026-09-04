@@ -109,25 +109,25 @@ pipeline {
                         error("Canary health check failed, deployment aborted")
                     }
 
-                    writeFile file: '/nginx-config/nginx.conf', text: '''events {}
-http {
-    upstream myapp {
-        server myapp-blue:8000 weight=9;
-        server myapp-green:8000 weight=1;
+                    writeFile file: '/nginx-config/myapp.conf', text: '''upstream myapp {
+    server myapp-blue:8000 weight=9;
+    server myapp-green:8000 weight=1;
+}
+
+server {
+    listen 80;
+
+    location / {
+        proxy_pass http://myapp;
     }
-    server {
-        listen 80;
-        location / {
-            proxy_pass http://myapp;
-        }
-        location /health {
-            proxy_pass http://myapp/health;
-        }
+
+    location /health {
+        proxy_pass http://myapp/health;
     }
 }
 '''
                     sh '''
-                        docker cp /nginx-config/nginx.conf myapp-nginx:/etc/nginx/nginx.conf
+                        docker cp /nginx-config/myapp.conf myapp-nginx:/etc/nginx/conf.d/myapp.conf
                         docker exec myapp-nginx nginx -s reload
                         echo "Canary receiving 10% of traffic"
                     '''
@@ -140,46 +140,46 @@ http {
                     ).trim()
 
                     if (canaryCheck == '200') {
-                        writeFile file: '/nginx-config/nginx.conf', text: '''events {}
-http {
-    upstream myapp {
-        server myapp-green:8000;
+                        writeFile file: '/nginx-config/myapp.conf', text: '''upstream myapp {
+    server myapp-green:8000;
+}
+
+server {
+    listen 80;
+
+    location / {
+        proxy_pass http://myapp;
     }
-    server {
-        listen 80;
-        location / {
-            proxy_pass http://myapp;
-        }
-        location /health {
-            proxy_pass http://myapp/health;
-        }
+
+    location /health {
+        proxy_pass http://myapp/health;
     }
 }
 '''
                         sh '''
-                            docker cp /nginx-config/nginx.conf myapp-nginx:/etc/nginx/nginx.conf
+                            docker cp /nginx-config/myapp.conf myapp-nginx:/etc/nginx/conf.d/myapp.conf
                             docker exec myapp-nginx nginx -s reload
                             echo "Canary promoted to 100% traffic"
                         '''
                     } else {
-                        writeFile file: '/nginx-config/nginx.conf', text: '''events {}
-http {
-    upstream myapp {
-        server myapp-blue:8000;
+                        writeFile file: '/nginx-config/myapp.conf', text: '''upstream myapp {
+    server myapp-blue:8000;
+}
+
+server {
+    listen 80;
+
+    location / {
+        proxy_pass http://myapp;
     }
-    server {
-        listen 80;
-        location / {
-            proxy_pass http://myapp;
-        }
-        location /health {
-            proxy_pass http://myapp/health;
-        }
+
+    location /health {
+        proxy_pass http://myapp/health;
     }
 }
 '''
                         sh '''
-                            docker cp /nginx-config/nginx.conf myapp-nginx:/etc/nginx/nginx.conf
+                            docker cp /nginx-config/myapp.conf myapp-nginx:/etc/nginx/conf.d/myapp.conf
                             docker exec myapp-nginx nginx -s reload
                             docker stop myapp-green || true
                             docker rm myapp-green || true
