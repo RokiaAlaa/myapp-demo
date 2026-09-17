@@ -9,6 +9,6 @@ replicas:
   count: 3
 images:
 - name: rokaa666/myapp
-  newTag: v1.1.0
+  newTag: v1.2.0
 commonLabels:
   environment: production
