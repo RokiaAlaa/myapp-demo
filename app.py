@@ -3,7 +3,7 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "Hello from CI/CD pipeline!"
+    return "Hello from CI/CD pipeline! (v1.1.0 canary)"
 
 @app.route('/health')
 def health():
