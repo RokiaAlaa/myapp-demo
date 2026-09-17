@@ -1,0 +1,14 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- configmap.yaml
+- ../../base
+namespace: staging
+replicas:
+- name: myapp
+  count: 2
+images:
+- name: rokaa666/myapp
+  newTag: staging-latest
+commonLabels:
+  environment: staging

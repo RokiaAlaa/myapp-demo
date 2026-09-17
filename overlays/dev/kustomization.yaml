@@ -1,0 +1,14 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- configmap.yaml
+- ../../base
+namespace: dev
+replicas:
+- name: myapp
+  count: 1
+images:
+- name: rokaa666/myapp
+  newTag: dev-latest
+commonLabels:
+  environment: development
