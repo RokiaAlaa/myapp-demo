@@ -9,6 +9,6 @@ replicas:
   count: 1
 images:
 - name: rokaa666/myapp
-  newTag: dev-latest
+  newTag: latest
 commonLabels:
   environment: development
