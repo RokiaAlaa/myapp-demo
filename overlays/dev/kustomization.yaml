@@ -6,7 +6,7 @@ resources:
 namespace: dev
 replicas:
 - name: myapp
-  count: 1
+  count: 2
 images:
 - name: rokaa666/myapp
   newTag: latest
